@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Mini App</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<style>
+body {
+  background:#0f172a;
+  color:#fff;
+  font-family:sans-serif;
+  padding:20px;
+}
+input, button {
+  width:100%;
+  padding:12px;
+  margin-top:10px;
+  font-size:16px;
+}
+button {
+  background:#38bdf8;
+  border:none;
+}
+</style>
+</head>
+
+<body>
+<h3>Введите число</h3>
+
+<input type="number" id="value" placeholder="100">
+<button onclick="send()">Отправить</button>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.expand();
+
+function send(){
+  fetch("/send",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      user_id:tg.initDataUnsafe.user.id,
+      value:document.getElementById("value").value
+    })
+  })
+}
+</script>
+</body>
+</html>
