@@ -32,10 +32,23 @@ const options = {
 const bot = new TelegramBot(TOKEN, options);
 
 // Configuración JSONbin
-const JSONBIN_BIN_ID = '69468d57d0ea881f40361a98';
-const JSONBIN_MASTER_KEY = '$2a$10$eCHhQtmSAhD8XqkrlFgE1O6N6OKwgmHrIg.G9hlrkDKIaex3GMuiW';
+const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
+const JSONBIN_MASTER_KEY = process.env.JSONBIN_MASTER_KEY;
 const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 const JSONBIN_URL_LATEST = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`;
+
+// Health check endpoint for Railway
+const express = require('express');
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
+app.listen(port, () => {
+  console.log(`Health check server running on port ${port}`);
+});
 
 // Estructura de base de datos inicial
 const initialDatabase = {

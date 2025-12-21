@@ -1,0 +1,134 @@
+{
+  "users": {
+    "1184897306": {
+      "id": "1184897306",
+      "name": "kissushhka",
+      "telegramId": 1184897306,
+      "balance": 300,
+      "investments": [
+        {
+          "id": "inv_1766312505444_2scpazbl2",
+          "amount": 200,
+          "startDate": "2025-12-21T10:21:45.444Z",
+          "endDate": "2025-12-21T14:21:45.444Z",
+          "status": "active",
+          "notifications": {
+            "created": true,
+            "twoHours": true,
+            "completed": false,
+            "purchase": true
+          }
+        }
+      ],
+      "createdAt": "2025-12-21T10:19:11.281Z",
+      "isAdmin": false
+    },
+    "admin_1766270935758": {
+      "id": "admin_1766270935758",
+      "name": "Admin",
+      "password": "Admin1231321",
+      "balance": 0,
+      "telegramId": "123456789",
+      "isAdmin": true,
+      "createdAt": "2025-12-20T22:48:55.758Z",
+      "investments": []
+    },
+    "user_1766270935765": {
+      "id": "user_1766270935765",
+      "name": "List",
+      "telegramId": "8382571809",
+      "balance": 0,
+      "isAdmin": false,
+      "createdAt": "2025-12-20T22:48:55.765Z",
+      "investments": []
+    },
+    "user_1766271464285": {
+      "id": "user_1766271464285",
+      "name": "𝘿𝙪𝙤𝙎𝙩𝙖𝙧𝙨🦉𝐆𝐚𝐫𝐚𝐧𝐭 𝟐%",
+      "telegramId": "7586266147",
+      "balance": 200,
+      "isAdmin": true,
+      "createdAt": "2025-12-20T22:57:44.285Z",
+      "investments": []
+    },
+    "8382571809": {
+      "id": "8382571809",
+      "name": "Андрей",
+      "telegramId": 8382571809,
+      "balance": 0,
+      "investments": [
+        {
+          "id": "inv_1766273787901_x08e40g6x",
+          "amount": 12,
+          "startDate": "2025-12-20T23:36:27.901Z",
+          "endDate": "2025-12-21T03:36:27.909Z",
+          "status": "active",
+          "notifications": {
+            "created": true,
+            "twoHours": false,
+            "completed": true,
+            "purchase": true
+          }
+        }
+      ],
+      "createdAt": "2025-12-20T23:34:32.297Z",
+      "isAdmin": true
+    },
+    "user_1766274668691_8sm4wf17y": {
+      "id": "user_1766274668691_8sm4wf17y",
+      "name": "ᴘᴜɢ",
+      "telegramId": "6890421398",
+      "balance": 0,
+      "isAdmin": false,
+      "createdAt": "2025-12-20T23:51:08.691Z",
+      "investments": [
+        {
+          "id": "inv_1766274885660_01xqpmijh",
+          "amount": 200,
+          "startDate": "2025-12-20T23:54:45.660Z",
+          "endDate": "2025-12-21T03:54:45.668Z",
+          "status": "active",
+          "notifications": {
+            "created": true,
+            "twoHours": false,
+            "completed": false,
+            "purchase": true
+          }
+        }
+      ]
+    },
+    "8022396358": {
+      "id": "8022396358",
+      "name": "Creecly",
+      "telegramId": 8022396358,
+      "balance": 0,
+      "investments": [],
+      "createdAt": "2025-12-21T10:19:11.280Z",
+      "isAdmin": false
+    },
+    "7586266147": {
+      "id": "7586266147",
+      "name": "jiruv",
+      "telegramId": 7586266147,
+      "balance": 0,
+      "investments": [],
+      "createdAt": "2025-12-21T11:30:15.024Z",
+      "isAdmin": false
+    }
+  },
+  "depositInstructions": {
+    "imageUrl": "https://i.ibb.co/7xVZ9S2p/receipt-1766238839803.jpg",
+    "message": "Test#1"
+  },
+  "settings": {
+    "admins": [
+      "Admin"
+    ]
+  },
+  "stats": {
+    "totalUsers": 8,
+    "totalInvested": 0,
+    "totalProfits": 0,
+    "lastUpdate": "2025-12-21T14:47:33.463Z"
+  }
+}
