@@ -4,11 +4,19 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
-// Configuración
-const TOKEN = '8272381619:AAGy9netoupQboX1WgI5I59fQvZkz_4OlLs';
-const ADMIN_ID = 8382571809;
+// ========== КОНФИГУРАЦИЯ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ==========
+const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const ADMIN_ID = parseInt(process.env.ADMIN_ID) || 0;
+const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
+const JSONBIN_MASTER_KEY = process.env.JSONBIN_MASTER_KEY;
 
-// Configuración mejorada para evitar errores de conexión
+// Проверка обязательных переменных
+if (!TOKEN) {
+    console.error('❌ ОШИБКА: TELEGRAM_BOT_TOKEN не установлен');
+    process.exit(1);
+}
+
+// Конфигурация бота
 const options = {
     polling: {
         interval: 1000,
@@ -31,13 +39,11 @@ const options = {
 
 const bot = new TelegramBot(TOKEN, options);
 
-// Configuración JSONbin
-const JSONBIN_BIN_ID = '69468d57d0ea881f40361a98';
-const JSONBIN_MASTER_KEY = '$2a$10$eCHhQtmSAhD8XqkrlFgE1O6N6OKwgmHrIg.G9hlrkDKIaex3GMuiW';
-const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
-const JSONBIN_URL_LATEST = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`;
+// URL для JSONbin
+const JSONBIN_URL = JSONBIN_BIN_ID ? `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}` : null;
+const JSONBIN_URL_LATEST = JSONBIN_BIN_ID ? `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest` : null;
 
-// Estructura de base de datos inicial
+// Структура базы данных
 const initialDatabase = {
     users: {},
     settings: {
@@ -54,14 +60,14 @@ const initialDatabase = {
     }
 };
 
-// Variables globales
-let database = JSON.parse(JSON.stringify(initialDatabase)); // Copia profunda
-const sentNotifications = new Map(); // Para evitar duplicados
+// Глобальные переменные
+let database = JSON.parse(JSON.stringify(initialDatabase));
+const sentNotifications = new Map();
 let isPolling = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
 
-// Función para verificar token con múltiples métodos
+// Проверка токена
 async function verifyTokenWithRetry(maxRetries = 5) {
     const methods = [
         async () => {
@@ -123,15 +129,13 @@ async function verifyTokenWithRetry(maxRetries = 5) {
     }
 }
 
-// Inicializar base de datos
+// Инициализация базы данных
 async function initializeDatabase() {
     try {
-        // Asegurar que todas las propiedades existan
         if (!database.users) database.users = {};
         if (!database.settings) database.settings = initialDatabase.settings;
         if (!database.stats) database.stats = initialDatabase.stats;
 
-        // Actualizar estadísticas
         database.stats.totalUsers = Object.keys(database.users).length;
         database.stats.lastUpdate = new Date().toISOString();
 
@@ -143,43 +147,45 @@ async function initializeDatabase() {
     }
 }
 
-// Cargar base de datos con fallback
+// Загрузка базы данных
 async function loadDatabase() {
     try {
         console.log('🔄 Cargando base de datos...');
 
-        // Intentar cargar desde JSONbin
-        try {
-            const agent = new https.Agent({
-                keepAlive: true,
-                family: 4,
-                timeout: 15000,
-                rejectUnauthorized: false
-            });
+        // Попытка загрузки из JSONbin
+        if (JSONBIN_URL_LATEST && JSONBIN_MASTER_KEY) {
+            try {
+                const agent = new https.Agent({
+                    keepAlive: true,
+                    family: 4,
+                    timeout: 15000,
+                    rejectUnauthorized: false
+                });
 
-            const response = await fetch(JSONBIN_URL_LATEST, {
-                headers: {
-                    'X-Master-Key': JSONBIN_MASTER_KEY,
-                    'Content-Type': 'application/json'
-                },
-                agent: agent,
-                timeout: 15000
-            });
+                const response = await fetch(JSONBIN_URL_LATEST, {
+                    headers: {
+                        'X-Master-Key': JSONBIN_MASTER_KEY,
+                        'Content-Type': 'application/json'
+                    },
+                    agent: agent,
+                    timeout: 15000
+                });
 
-            if (response.ok) {
-                const data = await response.json();
-                if (data.record) {
-                    database = data.record;
-                    await initializeDatabase();
-                    console.log('✅ Base de datos cargada desde JSONbin');
-                    return database;
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.record) {
+                        database = data.record;
+                        await initializeDatabase();
+                        console.log('✅ Base de datos cargada desde JSONbin');
+                        return database;
+                    }
                 }
+            } catch (error) {
+                console.error('❌ Error cargando desde JSONbin:', error.message);
             }
-        } catch (error) {
-            console.error('❌ Error cargando desde JSONbin:', error.message);
         }
 
-        // Cargar desde archivo local
+        // Локальный файл
         if (fs.existsSync('./database.json')) {
             try {
                 const localData = fs.readFileSync('./database.json', 'utf8');
@@ -192,7 +198,7 @@ async function loadDatabase() {
             }
         }
 
-        // Crear nueva base de datos
+        // Новая база данных
         database = JSON.parse(JSON.stringify(initialDatabase));
         await initializeDatabase();
         await saveDatabaseLocal();
@@ -207,48 +213,47 @@ async function loadDatabase() {
     }
 }
 
-// Guardar base de datos
+// Сохранение базы данных
 async function saveDatabase(data = null) {
     if (data) database = data;
 
-    // Actualizar estadísticas antes de guardar
     await initializeDatabase();
-
-    // Guardar localmente inmediatamente
     await saveDatabaseLocal();
 
-    // Intentar guardar en JSONbin
-    try {
-        const agent = new https.Agent({
-            keepAlive: true,
-            family: 4,
-            timeout: 15000,
-            rejectUnauthorized: false
-        });
+    // Сохранение в JSONbin (если настроено)
+    if (JSONBIN_URL && JSONBIN_MASTER_KEY) {
+        try {
+            const agent = new https.Agent({
+                keepAlive: true,
+                family: 4,
+                timeout: 15000,
+                rejectUnauthorized: false
+            });
 
-        const response = await fetch(JSONBIN_URL, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Master-Key': JSONBIN_MASTER_KEY
-            },
-            agent: agent,
-            timeout: 15000,
-            body: JSON.stringify(database)
-        });
+            const response = await fetch(JSONBIN_URL, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': JSONBIN_MASTER_KEY
+                },
+                agent: agent,
+                timeout: 15000,
+                body: JSON.stringify(database)
+            });
 
-        if (response.ok) {
-            console.log('✅ Base de datos guardada en JSONbin');
-        } else {
-            throw new Error(`HTTP ${response.status}`);
+            if (response.ok) {
+                console.log('✅ Base de datos guardada en JSONbin');
+            } else {
+                throw new Error(`HTTP ${response.status}`);
+            }
+        } catch (error) {
+            console.error('❌ Error guardando en JSONbin:', error.message);
+            console.log('📁 Datos guardados localmente');
         }
-    } catch (error) {
-        console.error('❌ Error guardando en JSONbin:', error.message);
-        console.log('📁 Datos guardados localmente');
     }
 }
 
-// Guardar localmente
+// Локальное сохранение
 async function saveDatabaseLocal() {
     try {
         fs.writeFileSync('./database.json', JSON.stringify(database, null, 2));
@@ -258,7 +263,7 @@ async function saveDatabaseLocal() {
     }
 }
 
-// Función de reconexión mejorada
+// Переподключение
 async function reconnectBot() {
     if (isPolling) return;
 
@@ -296,7 +301,7 @@ async function reconnectBot() {
     }, delay);
 }
 
-// Calcular crecimiento de inversión
+// Расчет роста инвестиций
 function calculateInvestmentGrowth(investment) {
     const now = new Date().getTime();
     const startTime = new Date(investment.startDate).getTime();
@@ -310,7 +315,7 @@ function calculateInvestmentGrowth(investment) {
     return 1 + (growthPercentage / 100);
 }
 
-// Enviar notificaciones de inversiones - SISTEMA CORREGIDO
+// Отправка уведомлений
 async function sendInvestmentNotifications() {
     try {
         console.log('🔍 Verificando notificaciones...');
@@ -328,21 +333,19 @@ async function sendInvestmentNotifications() {
                 const hoursElapsed = elapsed / (1000 * 60 * 60);
                 const isCompleted = hoursElapsed >= database.settings.investmentDuration;
 
-                // Asegurar que el objeto de notificaciones exista
                 if (!investment.notifications) {
                     investment.notifications = {
-                        purchase: false,    // Notificación de compra
-                        twoHours: false,    // Notificación a las 2 horas
-                        completed: false    // Notificación de finalización
+                        purchase: false,
+                        twoHours: false,
+                        completed: false
                     };
                     needsSaving = true;
                 }
 
-                // Crear clave única para esta notificación
                 const notificationKey = `${userId}_${investment.id}`;
                 const lastSentTime = sentNotifications.get(notificationKey) || 0;
 
-                // NOTIFICACIÓN DE COMPRA (solo una vez, inmediatamente después de crear)
+                // Уведомление о покупке
                 if (!investment.notifications.purchase && user.telegramId) {
                     const message = `🎉 *¡Nueva inversión creada!*\n\n` +
                                   `Has creado una nueva inversión con un monto de *${investment.amount} Bs.*\n\n` +
@@ -365,7 +368,7 @@ async function sendInvestmentNotifications() {
                     needsSaving = true;
                 }
 
-                // NOTIFICACIÓN A LAS 2 HORAS (solo una vez, entre 2h y 2h 10min)
+                // Уведомление через 2 часа
                 if (hoursElapsed >= 2 && hoursElapsed < 2.166 &&
                     !investment.notifications.twoHours &&
                     !investment.notifications.completed &&
@@ -392,7 +395,7 @@ async function sendInvestmentNotifications() {
                     needsSaving = true;
                 }
 
-                // NOTIFICACIÓN DE FINALIZACIÓN (solo una vez, cuando se completa)
+                // Уведомление о завершении
                 if (isCompleted &&
                     !investment.notifications.completed &&
                     user.telegramId) {
@@ -433,7 +436,7 @@ async function sendInvestmentNotifications() {
     }
 }
 
-// Enviar mensaje a usuario
+// Отправка сообщения пользователю
 function sendMessageToUser(chatId, message) {
     bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
         .then(() => {
@@ -444,7 +447,7 @@ function sendMessageToUser(chatId, message) {
         });
 }
 
-// Limpiar notificaciones antiguas (más de 24 horas)
+// Очистка старых уведомлений
 function cleanupOldNotifications() {
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
     let cleaned = 0;
@@ -461,9 +464,9 @@ function cleanupOldNotifications() {
     }
 }
 
-// =============== COMANDOS DEL BOT ===============
+// =============== КОМАНДЫ БОТА ===============
 
-// Comando /start
+// /start
 bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
     const username = msg.from.username || msg.from.first_name || 'Inversor';
@@ -472,10 +475,7 @@ bot.onText(/\/start/, async (msg) => {
     console.log(`👋 Nuevo usuario: ${username} (ID: ${chatId})`);
 
     try {
-        // Asegurar que la base de datos esté inicializada
         await initializeDatabase();
-
-        // Verificar si ya existe
         let user = database.users[userId];
 
         if (user) {
@@ -493,7 +493,7 @@ bot.onText(/\/start/, async (msg) => {
             return;
         }
 
-        // Crear nuevo usuario
+        // Новый пользователь
         user = {
             id: userId,
             name: username,
@@ -529,7 +529,7 @@ bot.onText(/\/start/, async (msg) => {
 
         bot.sendMessage(chatId, welcomeMessage, { parse_mode: 'Markdown' });
 
-        // Notificar al admin
+        // Уведомление админу
         if (chatId !== ADMIN_ID) {
             bot.sendMessage(ADMIN_ID, `👤 Nuevo usuario registrado:\n\nNombre: ${username}\nID: ${chatId}\nTotal usuarios: ${database.stats.totalUsers}`);
         }
@@ -539,7 +539,7 @@ bot.onText(/\/start/, async (msg) => {
     }
 });
 
-// Comando /misinversiones
+// /misinversiones
 bot.onText(/\/misinversiones/, async (msg) => {
     const chatId = msg.chat.id;
     const username = msg.from.username || msg.from.first_name || 'Usuario';
@@ -626,7 +626,6 @@ bot.onText(/\/misinversiones/, async (msg) => {
             message += `\n`;
         });
 
-        // Agregar estadísticas generales
         message += `📊 *ESTADÍSTICAS GENERALES*\n`;
         message += `📈 *Inversiones activas:* ${activeInvestments}\n`;
         message += `💰 *Total invertido:* ${totalInvested.toFixed(2)} Bs.\n`;
@@ -653,7 +652,7 @@ bot.onText(/\/misinversiones/, async (msg) => {
     }
 });
 
-// Comando /miperfil
+// /miperfil
 bot.onText(/\/miperfil/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
@@ -726,7 +725,7 @@ bot.onText(/\/miperfil/, async (msg) => {
                              `*💰 Total invertido:* ${totalInvestedAmount.toFixed(2)} Bs.\n\n`;
         }
 
-        const adviceMessage = `💡 *RECOMENDACIONES:*\n`;
+        let adviceMessage = `💡 *RECOMENDACIONES:*\n`;
 
         if (user.balance >= database.settings.minInvestment && (!user.investments || user.investments.length === 0)) {
             adviceMessage += `🎯 *¡Tienes saldo para invertir!*\n`;
@@ -754,7 +753,7 @@ bot.onText(/\/miperfil/, async (msg) => {
     }
 });
 
-// Comando /soporte
+// /soporte
 bot.onText(/\/soporte/, (msg) => {
     const chatId = msg.chat.id;
 
@@ -788,7 +787,7 @@ bot.onText(/\/soporte/, (msg) => {
     bot.sendMessage(chatId, supportMessage, { parse_mode: 'Markdown' });
 });
 
-// Comando /ayuda
+// /ayuda
 bot.onText(/\/ayuda/, (msg) => {
     const chatId = msg.chat.id;
 
@@ -828,14 +827,13 @@ bot.onText(/\/ayuda/, (msg) => {
     bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
 });
 
-// =============== COMANDOS DE ADMINISTRACIÓN ===============
+// =============== КОМАНДЫ АДМИНИСТРАТОРА ===============
 
-// Comando /admin - Panel de administración
+// /admin
 bot.onText(/\/admin/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
 
-    // Verificar si es admin
     if (chatId !== ADMIN_ID) {
         bot.sendMessage(chatId, '❌ No tienes permisos de administrador.');
         return;
@@ -844,7 +842,6 @@ bot.onText(/\/admin/, async (msg) => {
     try {
         await initializeDatabase();
 
-        // Contar estadísticas
         let totalInvested = 0;
         let totalUsers = Object.keys(database.users).length;
         let activeInvestments = 0;
@@ -890,7 +887,7 @@ bot.onText(/\/admin/, async (msg) => {
     }
 });
 
-// Comando /adduser
+// /adduser
 bot.onText(/\/adduser (.+) (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
 
@@ -926,7 +923,7 @@ bot.onText(/\/adduser (.+) (.+)/, async (msg, match) => {
     }
 });
 
-// Comando /addbalance
+// /addbalance
 bot.onText(/\/addbalance (.+) (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
 
@@ -956,7 +953,7 @@ bot.onText(/\/addbalance (.+) (.+)/, async (msg, match) => {
     }
 });
 
-// Comando /addinvestment
+// /addinvestment
 bot.onText(/\/addinvestment (.+) (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
 
@@ -995,7 +992,6 @@ bot.onText(/\/addinvestment (.+) (.+)/, async (msg, match) => {
 
         await saveDatabase();
 
-        // Notificar al usuario (solo una vez)
         if (user.telegramId) {
             const notification = `💰 *¡Nueva inversión creada por el administrador!*\n\n` +
                                `Monto: ${amount} Bs.\n` +
@@ -1013,7 +1009,7 @@ bot.onText(/\/addinvestment (.+) (.+)/, async (msg, match) => {
     }
 });
 
-// Comando /listusers
+// /listusers
 bot.onText(/\/listusers/, async (msg) => {
     const chatId = msg.chat.id;
 
@@ -1044,7 +1040,7 @@ bot.onText(/\/listusers/, async (msg) => {
     }
 });
 
-// Comando /stats
+// /stats
 bot.onText(/\/stats/, async (msg) => {
     const chatId = msg.chat.id;
 
@@ -1104,7 +1100,7 @@ bot.onText(/\/stats/, async (msg) => {
     }
 });
 
-// Comando /backup
+// /backup
 bot.onText(/\/backup/, async (msg) => {
     const chatId = msg.chat.id;
 
@@ -1119,7 +1115,6 @@ bot.onText(/\/backup/, async (msg) => {
         const backupName = `backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
         const backupPath = `./backups/${backupName}`;
 
-        // Crear directorio de backups si no existe
         if (!fs.existsSync('./backups')) {
             fs.mkdirSync('./backups');
         }
@@ -1133,18 +1128,16 @@ bot.onText(/\/backup/, async (msg) => {
     }
 });
 
-// Manejo de mensajes de texto
+// Обработка текстовых сообщений
 bot.on('message', (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
     const username = msg.from.username || msg.from.first_name || 'Usuario';
 
-    // Ignorar comandos
     if (text && text.startsWith('/')) return;
 
     console.log(`💬 Mensaje de ${username}: "${text}"`);
 
-    // Respuestas automáticas
     if (text && text.toLowerCase().includes('hola')) {
         const response = `¡Hola ${username}! Soy el bot de notificaciones de *Inversiones Bolivia* 🇧🇴\n\n` +
                         `Usa /start para ver cómo conectar tu cuenta y /ayuda para ver todos los comandos.\n\n` +
@@ -1167,7 +1160,6 @@ bot.on('message', (msg) => {
         return;
     }
 
-    // Respuesta por defecto
     if (text && text.trim().length > 0) {
         const response = `🤖 *Bot de Notificaciones*\n\n` +
                         `He recibido tu mensaje. Para una mejor atención:\n\n` +
@@ -1184,7 +1176,7 @@ bot.on('message', (msg) => {
     }
 });
 
-// Manejo de errores
+// Обработка ошибок
 bot.on('polling_error', (error) => {
     console.error('❌ Error de polling:', error.message);
 
@@ -1207,22 +1199,20 @@ process.on('uncaughtException', (error) => {
     console.error('❌ Excepción no capturada:', error);
 });
 
-// Función principal de inicio
+// Основная функция запуска
 async function startBot() {
     console.log('='.repeat(60));
-    console.log('🤖 Bot de Inversiones Bolivia - Versión CORREGIDA');
+    console.log('🤖 Bot de Inversiones Bolivia - Versión para Railway');
     console.log('👑 Administrador: ' + ADMIN_ID);
     console.log('📊 Sistema de notificaciones: 1 VEZ POR EVENTO');
     console.log('🕐 Notificaciones: Compra → 2h → Finalización');
     console.log('🚫 Anti-duplicación: ACTIVADO (24h cache)');
-    console.log('💾 Base de datos local y JSONbin activas');
+    console.log('💾 Base de datos local activa');
     console.log('='.repeat(60));
 
-    // Cargar e inicializar base de datos
     await loadDatabase();
 
     try {
-        // Verificar token
         const botInfo = await verifyTokenWithRetry(5);
 
         if (botInfo) {
@@ -1232,13 +1222,13 @@ async function startBot() {
             console.log('📱 Usa /start en Telegram para comenzar');
             console.log('='.repeat(60));
 
-            // Iniciar polling
             await bot.startPolling();
             isPolling = true;
             console.log('🚀 Bot iniciado y funcionando correctamente!');
 
-            // Notificar al admin
-            bot.sendMessage(ADMIN_ID, '🤖 Bot iniciado exitosamente\n\nSistema de notificaciones CORREGIDO:\n• Compra: 1 vez\n• 2 horas: 1 vez\n• Finalización: 1 vez\n\nUsa /admin para panel');
+            if (ADMIN_ID) {
+                bot.sendMessage(ADMIN_ID, '🤖 Bot iniciado exitosamente en Railway\n\nSistema de notificaciones CORREGIDO:\n• Compra: 1 vez\n• 2 horas: 1 vez\n• Finalización: 1 vez\n\nUsa /admin para panel');
+            }
         } else {
             throw new Error('No se pudo verificar el token');
         }
@@ -1255,10 +1245,27 @@ async function startBot() {
     }
 }
 
-// Iniciar intervalos - SÓLO UNA VEZ CADA 30 SEGUNDOS
-setInterval(sendInvestmentNotifications, 30000); // Verificar cada 30 segundos
-setInterval(cleanupOldNotifications, 60 * 60 * 1000); // Limpiar cada hora
-setInterval(() => saveDatabase(), 5 * 60 * 1000); // Guardar cada 5 minutos
+// Интервалы
+setInterval(sendInvestmentNotifications, 30000);
+setInterval(cleanupOldNotifications, 60 * 60 * 1000);
+setInterval(() => saveDatabase(), 5 * 60 * 1000);
 
-// Iniciar el bot
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('🛑 Получен SIGTERM, завершаем работу...');
+    if (isPolling) {
+        bot.stopPolling();
+    }
+    process.exit(0);
+});
+
+process.on('SIGINT', () => {
+    console.log('🛑 Получен SIGINT, завершаем работу...');
+    if (isPolling) {
+        bot.stopPolling();
+    }
+    process.exit(0);
+});
+
+// Запуск бота
 startBot();
